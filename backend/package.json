@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "cross-env NODE_ENV=test mocha --recursive --timeout 30000 \"tests/**/*.test.js\"",
     "start": "node server.js"
   },
   "keywords": [],
@@ -23,6 +23,12 @@
     "pino-pretty": "^11.3.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "chai": "^6.2.2",
+    "cross-env": "^10.1.0",
+    "mocha": "^11.7.5",
+    "mongodb-memory-server": "^11.1.0",
+    "nodemon": "^3.1.14",
+    "sinon": "^22.0.0",
+    "supertest": "^7.2.2"
   }
 }
