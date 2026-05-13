@@ -57,3 +57,8 @@ export const loginUser = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
+
+export const logoutUser = async (req, res) => {
+  logger.info({ userId: req.user?._id?.toString() }, "user logout");
+  return res.json({ success: true, message: "logged out" });
+};
