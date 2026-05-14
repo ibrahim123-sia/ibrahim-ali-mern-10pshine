@@ -1,0 +1,222 @@
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
+import axios from "axios";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const TOKEN_KEY = "token";
+
+const AppContext = createContext(null);
+
+export const AppProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setTokenState] = useState(() => localStorage.getItem(TOKEN_KEY));
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const api = useMemo(() => {
+    const instance = axios.create({
+      baseURL: API_BASE_URL,
+      headers: { "Content-Type": "application/json" },
+    });
+    instance.interceptors.request.use((config) => {
+      const t = localStorage.getItem(TOKEN_KEY);
+      if (t) config.headers.Authorization = `Bearer ${t}`;
+      return config;
+    });
+    return instance;
+  }, []);
+
+  const handleError = (err) => {
+    const message =
+      err?.response?.data?.message || err?.message || "Something went wrong";
+    setError(message);
+    throw new Error(message);
+  };
+
+  // ---------------- USER APIs ----------------
+  const registerUser = useCallback(
+    async ({ name, email, password }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.post("/users/register", { name, email, password });
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  const loginUser = useCallback(
+    async ({ email, password }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.post("/users/login", { email, password });
+        if (data?.success && data?.token) {
+          localStorage.setItem(TOKEN_KEY, data.token);
+          setTokenState(data.token);
+        } else {
+          throw new Error(data?.message || "Invalid email or password");
+        }
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  const logoutUser = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.post("/users/logout");
+      return data;
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message);
+    } finally {
+      localStorage.removeItem(TOKEN_KEY);
+      setTokenState(null);
+      setUser(null);
+      setNotes([]);
+      setLoading(false);
+    }
+  }, [api]);
+
+  const fetchProfile = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get("/users/profile");
+      setUser(data);
+      return data;
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  // ---------------- NOTE APIs ----------------
+  const createNote = useCallback(
+    async ({ title, content }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.post("/notes", { title, content });
+        setNotes((prev) => [...prev, data]);
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  const getUserNotes = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get("/notes");
+      setNotes(data || []);
+      return data;
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  const getNoteById = useCallback(
+    async (id) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.get(`/notes/${id}`);
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  const updateNote = useCallback(
+    async (id, { title, content }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.put(`/notes/${id}`, { title, content });
+        setNotes((prev) => prev.map((n) => (n._id === id ? data : n)));
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  const deleteNote = useCallback(
+    async (id) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.delete(`/notes/${id}`);
+        setNotes((prev) => prev.filter((n) => n._id !== id));
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  useEffect(() => {
+    if (token && !user) {
+      fetchProfile().catch(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        setTokenState(null);
+      });
+    }
+  }, [token, user, fetchProfile]);
+
+  const value = {
+    user,
+    token,
+    notes,
+    loading,
+    error,
+    isAuthenticated: !!token,
+    registerUser,
+    loginUser,
+    logoutUser,
+    fetchProfile,
+    createNote,
+    getUserNotes,
+    getNoteById,
+    updateNote,
+    deleteNote,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+};
+
+export const useAppContext = () => {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useAppContext must be used within an AppProvider");
+  return ctx;
+};
