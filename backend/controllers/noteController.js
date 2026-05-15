@@ -10,7 +10,16 @@ const ALLOWED_UPDATE_FIELDS = [
     'favorite',
     'archived',
     'deletedAt',
+    'noteColor',
+    'textColor',
+    'fontStyle',
+    'checklist',
+    'moodLabel',
 ];
+
+const FONT_STYLES = ['sans', 'serif', 'mono'];
+const MOOD_LABELS = ['', 'productive', 'study', 'idea', 'important'];
+const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 const sanitizeCategory = (value) => {
     if (value === null || value === '' || value === undefined) return null;
@@ -24,6 +33,23 @@ const sanitizeTags = (value) => {
         .map((t) => (typeof t === 'string' ? t.trim().toLowerCase() : ''))
         .filter((t) => t.length > 0 && t.length <= 40);
     return Array.from(new Set(cleaned));
+};
+
+const sanitizeColor = (value) => {
+    if (value === '' || value === null) return '';
+    if (typeof value === 'string' && HEX_COLOR_RE.test(value)) return value;
+    return undefined;
+};
+
+const sanitizeChecklist = (value) => {
+    if (!Array.isArray(value)) return undefined;
+    return value
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => ({
+            text: typeof item.text === 'string' ? item.text.slice(0, 200) : '',
+            done: !!item.done,
+        }))
+        .slice(0, 100); // cap at 100 items
 };
 
 const buildUpdate = (body) => {
@@ -41,6 +67,16 @@ const buildUpdate = (body) => {
             update.deletedAt = raw ? new Date(raw) : null;
         } else if (['pinned', 'favorite', 'archived'].includes(key)) {
             update[key] = !!raw;
+        } else if (key === 'noteColor' || key === 'textColor') {
+            const sanitized = sanitizeColor(raw);
+            if (sanitized !== undefined) update[key] = sanitized;
+        } else if (key === 'fontStyle') {
+            if (FONT_STYLES.includes(raw)) update.fontStyle = raw;
+        } else if (key === 'moodLabel') {
+            if (MOOD_LABELS.includes(raw)) update.moodLabel = raw;
+        } else if (key === 'checklist') {
+            const sanitized = sanitizeChecklist(raw);
+            if (sanitized !== undefined) update.checklist = sanitized;
         } else if (typeof raw === 'string') {
             update[key] = raw;
         }

@@ -43,6 +43,34 @@ const noteSchema = new mongoose.Schema(
             default: null,
             index: true,
         },
+        noteColor: {
+            type: String,
+            default: '',
+        },
+        textColor: {
+            type: String,
+            default: '',
+        },
+        fontStyle: {
+            type: String,
+            enum: ['sans', 'serif', 'mono'],
+            default: 'sans',
+        },
+        checklist: {
+            type: [
+                {
+                    _id: false,
+                    text: { type: String, default: '' },
+                    done: { type: Boolean, default: false },
+                },
+            ],
+            default: [],
+        },
+        moodLabel: {
+            type: String,
+            enum: ['', 'productive', 'study', 'idea', 'important'],
+            default: '',
+        },
     },
     { timestamps: true }
 );
