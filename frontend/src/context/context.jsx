@@ -274,6 +274,25 @@ export const AppProvider = ({ children }) => {
     [api]
   );
 
+  // ---------------- VOICE ----------------
+  const transcribeAudio = useCallback(
+    async ({ file, mode = "cleanup" }) => {
+      setError(null);
+      try {
+        const form = new FormData();
+        form.append("audio", file);
+        form.append("mode", mode);
+        const { data } = await api.post("/voice/transcribe", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
   // ---------------- REORDER ----------------
   const reorderNotes = useCallback(
     async (ids) => {
@@ -328,6 +347,7 @@ export const AppProvider = ({ children }) => {
     deleteCategory,
     suggestNote,
     reorderNotes,
+    transcribeAudio,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
