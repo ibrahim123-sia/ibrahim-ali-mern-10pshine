@@ -81,9 +81,21 @@ const Sidebar = ({
             onClick={() => setShowProfileMenu((v) => !v)}
             className="w-full flex items-center gap-3 p-2.5 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 hover:shadow-sm transition"
           >
-            <div className="w-8 h-8 rounded-full bg-amber-600 text-white flex items-center justify-center font-medium text-sm">
-              {initial}
-            </div>
+            {user?.profileImage ? (
+              <img
+                src={
+                  user.profileImage.startsWith("http")
+                    ? user.profileImage
+                    : `${import.meta.env.VITE_API_ORIGIN || "http://localhost:5000"}${user.profileImage}`
+                }
+                alt={user.name || "Avatar"}
+                className="w-8 h-8 rounded-full object-cover border border-stone-200 dark:border-stone-700"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-amber-600 text-white flex items-center justify-center font-medium text-sm">
+                {initial}
+              </div>
+            )}
             <div className="flex-1 min-w-0 text-left">
               <div className="text-sm font-medium text-stone-800 dark:text-stone-100 truncate">
                 {user?.name || "Loading..."}
@@ -102,11 +114,14 @@ const Sidebar = ({
           {showProfileMenu && (
             <div className="mt-2 p-1 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 animate-fade-in">
               <button
-                disabled
-                className="w-full text-left px-3 py-2 text-sm text-stone-400 dark:text-stone-500 rounded cursor-not-allowed"
-                title="Coming in the Profile PR"
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  onClose?.();
+                  navigate("/profile");
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 rounded"
               >
-                Manage profile (soon)
+                Manage profile
               </button>
               <button
                 onClick={toggleTheme}
