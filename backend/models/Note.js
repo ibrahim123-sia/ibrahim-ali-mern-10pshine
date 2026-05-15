@@ -75,6 +75,10 @@ const noteSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        voiceNote: {
+            type: String,
+            default: '',
+        },
     },
     { timestamps: true }
 );

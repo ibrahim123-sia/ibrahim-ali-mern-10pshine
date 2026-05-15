@@ -9,6 +9,7 @@ import userRouter from "./routes/userRoute.js"
 import noteRouter from "./routes/noteRoutes.js"
 import categoryRouter from "./routes/categoryRoutes.js"
 import aiRouter from "./routes/aiRoutes.js"
+import voiceRouter from "./routes/voiceRoutes.js"
 dotenv.config()
 const PORT = process.env.PORT || 5000
 const app = express()
@@ -24,6 +25,7 @@ app.use("/api/users", userRouter)
 app.use("/api", noteRouter)
 app.use("/api", categoryRouter)
 app.use("/api", aiRouter)
+app.use("/api", voiceRouter)
 
 app.use((err, req, res, next) => {
     logger.error({err}, "unhandled error")

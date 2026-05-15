@@ -16,6 +16,7 @@ const ALLOWED_UPDATE_FIELDS = [
     'checklist',
     'moodLabel',
     'order',
+    'voiceNote',
 ];
 
 const FONT_STYLES = ['sans', 'serif', 'mono'];
