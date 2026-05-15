@@ -8,6 +8,8 @@ import {
   Palette,
   ChevronUp,
   Sparkles,
+  Mic,
+  Play,
 } from "lucide-react";
 import { useAppContext } from "../context/context.jsx";
 import TagInput from "./TagInput.jsx";
@@ -17,6 +19,12 @@ import MoodPicker from "./customization/MoodPicker.jsx";
 import ChecklistEditor from "./customization/ChecklistEditor.jsx";
 import AutoSaveIndicator from "./customization/AutoSaveIndicator.jsx";
 import SmartPanel from "./smart/SmartPanel.jsx";
+import VoiceRecorder from "./voice/VoiceRecorder.jsx";
+
+const API_ORIGIN =
+  import.meta.env.VITE_API_ORIGIN || "http://localhost:5000";
+const resolveAudioUrl = (path) =>
+  !path ? "" : path.startsWith("http") ? path : `${API_ORIGIN}${path}`;
 
 const NOTE_COLOR_OPTIONS = [
   "#fef3c7", // amber-100
@@ -148,6 +156,8 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
   const [moodLabel, setMoodLabel] = useState("");
   const [showCustomize, setShowCustomize] = useState(false);
   const [showSmart, setShowSmart] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const [voiceNote, setVoiceNote] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -183,8 +193,10 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     setFontStyle(note?.fontStyle || "sans");
     setChecklist(note?.checklist || []);
     setMoodLabel(note?.moodLabel || "");
+    setVoiceNote(note?.voiceNote || "");
     setShowCustomize(false);
     setShowSmart(false);
+    setShowVoice(false);
     setError(null);
     setSaving(false);
     setAutoSaveStatus("idle");
@@ -221,6 +233,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
       fontStyle,
       checklist: checklist.filter((i) => i.text.trim().length > 0 || i.done),
       moodLabel,
+      voiceNote,
     }),
     [
       title,
@@ -234,6 +247,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
       fontStyle,
       checklist,
       moodLabel,
+      voiceNote,
     ]
   );
 
@@ -332,6 +346,19 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={() => setShowVoice((v) => !v)}
+              className={`p-1.5 rounded transition ${
+                showVoice
+                  ? "text-rose-600 bg-rose-50 dark:bg-rose-900/30"
+                  : "text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700"
+              }`}
+              title="Voice to text"
+              aria-pressed={showVoice}
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => setShowSmart((v) => !v)}
               className={`p-1.5 rounded transition ${
                 showSmart
@@ -391,6 +418,18 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
             </button>
           </div>
         </div>
+
+        {showVoice && (
+          <VoiceRecorder
+            onResult={(data) => {
+              // Append the transcribed/cleaned text and store the audio url
+              setContent((c) => (c ? `${c}\n\n${data.text}` : data.text));
+              if (data.audioUrl) setVoiceNote(data.audioUrl);
+              setShowVoice(false);
+            }}
+            onCancel={() => setShowVoice(false)}
+          />
+        )}
 
         {showSmart && (
           <SmartPanel
@@ -486,6 +525,29 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
             className="w-full bg-transparent border-0 focus:outline-none resize-none text-stone-700 dark:text-stone-200 placeholder:text-stone-300 dark:placeholder:text-stone-600 leading-relaxed"
             style={{ fontFamily }}
           />
+
+          {voiceNote && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-rose-50/60 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg">
+              <Mic className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+              <span className="text-xs text-stone-600 dark:text-stone-300 flex-1 min-w-0 truncate">
+                Voice recording attached
+              </span>
+              <audio
+                controls
+                preload="none"
+                src={resolveAudioUrl(voiceNote)}
+                className="h-7 max-w-[240px]"
+              />
+              <button
+                type="button"
+                onClick={() => setVoiceNote("")}
+                className="text-xs text-stone-500 hover:text-red-600"
+                title="Remove voice attachment"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           <ChecklistEditor value={checklist} onChange={setChecklist} />
 
