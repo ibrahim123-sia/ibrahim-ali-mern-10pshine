@@ -10,6 +10,7 @@ export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setTokenState] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [notes, setNotes] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -105,12 +106,12 @@ export const AppProvider = ({ children }) => {
 
   // ---------------- NOTE APIs ----------------
   const createNote = useCallback(
-    async ({ title, content }) => {
+    async (payload) => {
       setLoading(true);
       setError(null);
       try {
-        const { data } = await api.post("/notes", { title, content });
-        setNotes((prev) => [...prev, data]);
+        const { data } = await api.post("/notes", payload);
+        setNotes((prev) => [data, ...prev]);
         return data;
       } catch (err) {
         handleError(err);
@@ -152,17 +153,86 @@ export const AppProvider = ({ children }) => {
   );
 
   const updateNote = useCallback(
-    async (id, { title, content }) => {
+    async (id, payload) => {
       setLoading(true);
       setError(null);
       try {
-        const { data } = await api.put(`/notes/${id}`, { title, content });
+        const { data } = await api.put(`/notes/${id}`, payload);
         setNotes((prev) => prev.map((n) => (n._id === id ? data : n)));
         return data;
       } catch (err) {
         handleError(err);
       } finally {
         setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  // Convenience helpers for single-field toggles
+  const patchNote = useCallback(
+    async (id, partial) => updateNote(id, partial),
+    [updateNote]
+  );
+
+  // ---------------- CATEGORY APIs ----------------
+  const getCategories = useCallback(async () => {
+    setError(null);
+    try {
+      const { data } = await api.get("/categories");
+      setCategories(data || []);
+      return data;
+    } catch (err) {
+      handleError(err);
+    }
+  }, [api]);
+
+  const createCategory = useCallback(
+    async ({ name, color, icon }) => {
+      setError(null);
+      try {
+        const { data } = await api.post("/categories", { name, color, icon });
+        setCategories((prev) =>
+          [...prev, data].sort((a, b) => a.name.localeCompare(b.name))
+        );
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
+  const updateCategory = useCallback(
+    async (id, payload) => {
+      setError(null);
+      try {
+        const { data } = await api.put(`/categories/${id}`, payload);
+        setCategories((prev) =>
+          prev
+            .map((c) => (c._id === id ? data : c))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        );
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
+  const deleteCategory = useCallback(
+    async (id) => {
+      setError(null);
+      try {
+        await api.delete(`/categories/${id}`);
+        setCategories((prev) => prev.filter((c) => c._id !== id));
+        // Clear category from any cached notes that referenced it
+        setNotes((prev) =>
+          prev.map((n) => (n.category === id ? { ...n, category: null } : n))
+        );
+      } catch (err) {
+        handleError(err);
       }
     },
     [api]
@@ -198,6 +268,7 @@ export const AppProvider = ({ children }) => {
     user,
     token,
     notes,
+    categories,
     loading,
     error,
     isAuthenticated: !!token,
@@ -209,7 +280,12 @@ export const AppProvider = ({ children }) => {
     getUserNotes,
     getNoteById,
     updateNote,
+    patchNote,
     deleteNote,
+    getCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

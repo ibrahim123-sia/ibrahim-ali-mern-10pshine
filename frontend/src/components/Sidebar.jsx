@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Search,
   Sun,
@@ -9,21 +9,27 @@ import {
   Hash,
   Clock,
   X,
+  Plus,
+  Settings2,
+  Inbox,
+  Pin,
+  Star,
+  Archive,
+  Trash2,
 } from "lucide-react";
 import { useAppContext } from "../context/context.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useNavigate } from "react-router-dom";
 import Logo from "./Logo.jsx";
+import CategoryManagerModal from "./CategoryManagerModal.jsx";
 
-// Static placeholders — these become real in later PRs (categories / tags / activity)
-const PLACEHOLDER_CATEGORIES = [
-  { name: "Study", color: "bg-blue-500", count: 0 },
-  { name: "Work", color: "bg-emerald-500", count: 0 },
-  { name: "Personal", color: "bg-pink-500", count: 0 },
-  { name: "Ideas", color: "bg-purple-500", count: 0 },
-  { name: "Tasks", color: "bg-amber-500", count: 0 },
+const FILTER_CHIPS = [
+  { key: "all", label: "All Notes", icon: Inbox },
+  { key: "pinned", label: "Pinned", icon: Pin },
+  { key: "favorites", label: "Favorites", icon: Star },
+  { key: "archived", label: "Archived", icon: Archive },
+  { key: "trash", label: "Trash", icon: Trash2 },
 ];
-const PLACEHOLDER_TAGS = ["#mern", "#dbms", "#exam", "#important"];
 
 const Sidebar = ({
   searchQuery,
@@ -31,11 +37,18 @@ const Sidebar = ({
   searchInputRef,
   isOpen,
   onClose,
+  filter,
+  onFilterChange,
+  categoryFilter,
+  onCategoryFilter,
+  tagFilter,
+  onTagFilter,
 }) => {
-  const { user, logoutUser } = useAppContext();
+  const { user, logoutUser, notes, categories } = useAppContext();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showCategoryMgr, setShowCategoryMgr] = useState(false);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -43,6 +56,29 @@ const Sidebar = ({
   };
 
   const initial = (user?.name || user?.email || "U").charAt(0).toUpperCase();
+
+  // Note counts per category (excluding trashed + archived)
+  const categoryCounts = useMemo(() => {
+    const map = {};
+    for (const n of notes || []) {
+      if (n.deletedAt || n.archived) continue;
+      if (!n.category) continue;
+      map[n.category] = (map[n.category] || 0) + 1;
+    }
+    return map;
+  }, [notes]);
+
+  // Aggregate all tags (excluding trashed + archived), with counts
+  const tagList = useMemo(() => {
+    const counts = {};
+    for (const n of notes || []) {
+      if (n.deletedAt || n.archived) continue;
+      for (const t of n.tags || []) counts[t] = (counts[t] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20);
+  }, [notes]);
 
   return (
     <>
@@ -167,48 +203,129 @@ const Sidebar = ({
 
         {/* Scrollable sections */}
         <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-6">
-          {/* Categories (placeholders) */}
+          {/* Filter chips */}
           <section>
-            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-2">
-              <Folder className="w-3.5 h-3.5" />
-              Categories
-            </h3>
-            <ul className="space-y-1">
-              {PLACEHOLDER_CATEGORIES.map((cat) => (
-                <li key={cat.name}>
-                  <button
-                    disabled
-                    className="w-full flex items-center justify-between px-2 py-1.5 text-sm text-stone-500 dark:text-stone-500 rounded cursor-not-allowed opacity-70"
-                    title="Coming in the Categories PR"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${cat.color}`} />
-                      {cat.name}
-                    </span>
-                    <span className="text-xs text-stone-400">{cat.count}</span>
-                  </button>
-                </li>
-              ))}
+            <ul className="space-y-0.5">
+              {FILTER_CHIPS.map(({ key, label, icon: Icon }) => {
+                const active = filter === key && !categoryFilter && !tagFilter;
+                return (
+                  <li key={key}>
+                    <button
+                      onClick={() => {
+                        onFilterChange(key);
+                        onCategoryFilter(null);
+                        onTagFilter(null);
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-lg transition ${
+                        active
+                          ? "bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-medium"
+                          : "text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span>{label}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </section>
 
-          {/* Tags (placeholders) */}
+          {/* Categories */}
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                <Folder className="w-3.5 h-3.5" />
+                Categories
+              </h3>
+              <button
+                onClick={() => setShowCategoryMgr(true)}
+                className="p-1 rounded text-stone-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                title="Manage categories"
+                aria-label="Manage categories"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {categories.length === 0 ? (
+              <button
+                onClick={() => setShowCategoryMgr(true)}
+                className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add your first category
+              </button>
+            ) : (
+              <ul className="space-y-0.5">
+                {categories.map((cat) => {
+                  const active = categoryFilter === cat._id;
+                  return (
+                    <li key={cat._id}>
+                      <button
+                        onClick={() => {
+                          onCategoryFilter(active ? null : cat._id);
+                          onTagFilter(null);
+                          onFilterChange("all");
+                        }}
+                        className={`w-full flex items-center justify-between px-2 py-1.5 text-sm rounded transition ${
+                          active
+                            ? "bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-medium"
+                            : "text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: cat.color || "#f59e0b" }}
+                          />
+                          <span className="truncate">{cat.name}</span>
+                        </span>
+                        <span className="text-xs text-stone-400">
+                          {categoryCounts[cat._id] || 0}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          {/* Tags */}
           <section>
             <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-2">
               <Hash className="w-3.5 h-3.5" />
               Tags
             </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {PLACEHOLDER_TAGS.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-xs px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-500 border border-stone-200 dark:border-stone-700 cursor-not-allowed"
-                  title="Coming in the Tags PR"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
+            {tagList.length === 0 ? (
+              <p className="text-xs text-stone-400 dark:text-stone-500 italic px-2">
+                Tags you add to notes appear here.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {tagList.map(([tag, count]) => {
+                  const active = tagFilter === tag;
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => {
+                        onTagFilter(active ? null : tag);
+                        onCategoryFilter(null);
+                        onFilterChange("all");
+                      }}
+                      className={`text-xs px-2 py-0.5 rounded-full border transition ${
+                        active
+                          ? "bg-amber-600 text-white border-amber-700"
+                          : "bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-700 hover:border-amber-300"
+                      }`}
+                      title={`${count} note${count === 1 ? "" : "s"}`}
+                    >
+                      #{tag}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {/* Recent activity placeholder */}
@@ -228,6 +345,11 @@ const Sidebar = ({
           NoWrite · v0.1
         </div>
       </aside>
+
+      <CategoryManagerModal
+        open={showCategoryMgr}
+        onClose={() => setShowCategoryMgr(false)}
+      />
     </>
   );
 };
