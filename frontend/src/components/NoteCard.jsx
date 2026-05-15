@@ -7,6 +7,7 @@ import {
   Archive,
   ArchiveRestore,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { formatRelativeTime, stripHtml } from "../utils/formatTime.js";
@@ -171,6 +172,7 @@ const CardMenu = ({
   onUnarchive,
   onRestore,
   onPermanentDelete,
+  onStudy,
 }) => (
   <div ref={menuRef} className="absolute top-3 right-3">
     <button
@@ -221,6 +223,17 @@ const CardMenu = ({
             >
               Edit
             </MenuItem>
+            {onStudy && (
+              <MenuItem
+                icon={<Sparkles className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onStudy(note);
+                }}
+              >
+                AI Study
+              </MenuItem>
+            )}
             {isArchived ? (
               <MenuItem
                 icon={<ArchiveRestore className="w-3.5 h-3.5" />}
@@ -271,6 +284,7 @@ const NoteCard = ({
   onUnarchive,
   onRestore,
   onPermanentDelete,
+  onStudy,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -336,6 +350,7 @@ const NoteCard = ({
           onUnarchive={onUnarchive}
           onRestore={onRestore}
           onPermanentDelete={onPermanentDelete}
+          onStudy={onStudy}
         />
       </div>
     );
@@ -397,6 +412,7 @@ const NoteCard = ({
           onUnarchive={onUnarchive}
           onRestore={onRestore}
           onPermanentDelete={onPermanentDelete}
+          onStudy={onStudy}
         />
       </div>
     );
@@ -456,6 +472,7 @@ const NoteCard = ({
         onUnarchive={onUnarchive}
         onRestore={onRestore}
         onPermanentDelete={onPermanentDelete}
+        onStudy={onStudy}
       />
     </div>
   );
