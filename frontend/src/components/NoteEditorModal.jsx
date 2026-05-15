@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useAppContext } from "../context/context.jsx";
+import { stripHtml } from "../utils/formatTime.js";
+import RichTextEditor from "./editor/RichTextEditor.jsx";
 
 const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
   const { createNote, updateNote } = useAppContext();
@@ -9,6 +11,20 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const titleRef = useRef(null);
+  // Refs mirror the latest state so the keyboard handler always sees current values
+  const titleRefVal = useRef("");
+  const contentRefVal = useRef("");
+  const savingRef = useRef(false);
+
+  useEffect(() => {
+    titleRefVal.current = title;
+  }, [title]);
+  useEffect(() => {
+    contentRefVal.current = content;
+  }, [content]);
+  useEffect(() => {
+    savingRef.current = saving;
+  }, [saving]);
 
   useEffect(() => {
     if (!open) return;
@@ -19,21 +35,12 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
     setTimeout(() => titleRef.current?.focus(), 50);
   }, [open, note]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const handleSave = async () => {
-    const trimmedTitle = title.trim();
-    const trimmedContent = content.trim();
-    if (!trimmedTitle && !trimmedContent) {
+  const handleSave = useCallback(async () => {
+    if (savingRef.current) return;
+    const trimmedTitle = titleRefVal.current.trim();
+    const rawContent = contentRefVal.current;
+    const hasContent = stripHtml(rawContent).length > 0;
+    if (!trimmedTitle && !hasContent) {
       setError("A title or some content is required.");
       return;
     }
@@ -43,12 +50,12 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
       if (mode === "edit" && note?._id) {
         await updateNote(note._id, {
           title: trimmedTitle || "Untitled",
-          content: trimmedContent,
+          content: rawContent,
         });
       } else {
         await createNote({
           title: trimmedTitle || "Untitled",
-          content: trimmedContent,
+          content: rawContent,
         });
       }
       onClose();
@@ -57,7 +64,25 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [mode, note, createNote, updateNote, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose, handleSave]);
+
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 animate-fade-in">
@@ -65,7 +90,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-stone-800 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-700 animate-scale-in">
+      <div className="relative w-full max-w-3xl max-h-[92vh] flex flex-col bg-white dark:bg-stone-800 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-700 animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-700">
           <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
@@ -91,13 +116,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
             className="w-full text-2xl font-semibold bg-transparent border-0 focus:outline-none text-stone-800 dark:text-stone-100 placeholder:text-stone-300 dark:placeholder:text-stone-600"
             style={{ fontFamily: "Georgia, serif" }}
           />
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Start writing…"
-            rows={12}
-            className="w-full bg-transparent border-0 focus:outline-none resize-none text-stone-700 dark:text-stone-200 placeholder:text-stone-300 dark:placeholder:text-stone-600 leading-relaxed"
-          />
+          <RichTextEditor value={content} onChange={setContent} />
           {error && (
             <div className="text-sm text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
               {error}
@@ -108,7 +127,10 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose }) => {
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-stone-200 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-900/40 rounded-b-2xl">
           <p className="text-xs text-stone-400 dark:text-stone-500">
-            Rich formatting coming soon
+            <kbd className="border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-[10px] bg-white dark:bg-stone-800">
+              Ctrl S
+            </kbd>{" "}
+            to save · <kbd className="border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-[10px] bg-white dark:bg-stone-800">Esc</kbd> to close
           </p>
           <div className="flex gap-2">
             <button
