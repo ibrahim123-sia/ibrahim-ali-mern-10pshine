@@ -7,6 +7,7 @@ import pinoHttp from 'pino-http'
 import logger from "./configs/logger.js"
 import userRouter from "./routes/userRoute.js"
 import noteRouter from "./routes/noteRoutes.js"
+import categoryRouter from "./routes/categoryRoutes.js"
 dotenv.config()
 const PORT = process.env.PORT || 5000
 const app = express()
@@ -20,6 +21,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))
 
 app.use("/api/users", userRouter)
 app.use("/api", noteRouter)
+app.use("/api", categoryRouter)
 
 app.use((err, req, res, next) => {
     logger.error({err}, "unhandled error")
