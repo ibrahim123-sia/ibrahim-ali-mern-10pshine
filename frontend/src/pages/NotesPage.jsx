@@ -423,6 +423,7 @@ const NotesPage = () => {
       />
 
       <StudyModeModal
+        key={studyNote?._id || "study-closed"}
         open={!!studyNote}
         note={studyNote}
         onClose={() => setStudyNote(null)}

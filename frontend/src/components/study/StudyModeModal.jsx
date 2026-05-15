@@ -18,20 +18,13 @@ const QUIZ_COUNT = 5;
 
 const StudyModeModal = ({ open, note, onClose }) => {
   const { generateFlashcards, generateQuiz } = useAppContext();
+  // State is reset via the `key` prop on the call site, which remounts
+  // this component for each new note — no setState-in-effect needed.
   const [mode, setMode] = useState("flashcards"); // flashcards | quiz
   const [phase, setPhase] = useState("intro"); // intro | loading | ready | error
   const [cards, setCards] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setMode("flashcards");
-    setPhase("intro");
-    setCards([]);
-    setQuestions([]);
-    setError(null);
-  }, [open, note?._id]);
 
   useEffect(() => {
     if (!open) return;
