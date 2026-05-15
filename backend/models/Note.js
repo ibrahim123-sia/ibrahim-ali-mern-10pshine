@@ -71,6 +71,10 @@ const noteSchema = new mongoose.Schema(
             enum: ['', 'productive', 'study', 'idea', 'important'],
             default: '',
         },
+        order: {
+            type: Number,
+            default: 0,
+        },
     },
     { timestamps: true }
 );

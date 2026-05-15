@@ -15,6 +15,7 @@ const ALLOWED_UPDATE_FIELDS = [
     'fontStyle',
     'checklist',
     'moodLabel',
+    'order',
 ];
 
 const FONT_STYLES = ['sans', 'serif', 'mono'];
@@ -77,6 +78,9 @@ const buildUpdate = (body) => {
         } else if (key === 'checklist') {
             const sanitized = sanitizeChecklist(raw);
             if (sanitized !== undefined) update.checklist = sanitized;
+        } else if (key === 'order') {
+            const n = Number(raw);
+            if (Number.isFinite(n)) update.order = n;
         } else if (typeof raw === 'string') {
             update[key] = raw;
         }
@@ -143,6 +147,33 @@ export const updateNote = async (req, res) => {
             return res.status(404).json({ message: 'Note not found' });
         }
         res.status(200).json(updatedNote);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const reorderNotes = async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'ids array is required' });
+        }
+        const valid = ids.filter((id) => mongoose.isValidObjectId(id));
+        if (valid.length === 0) {
+            return res.status(400).json({ message: 'No valid note ids provided' });
+        }
+        // bulkWrite scoped to the current user — never touch other users' notes
+        const ops = valid.map((id, idx) => ({
+            updateOne: {
+                filter: { _id: id, userId: req.user._id },
+                update: { $set: { order: idx } },
+            },
+        }));
+        const result = await Note.bulkWrite(ops);
+        return res.json({
+            matched: result.matchedCount,
+            modified: result.modifiedCount,
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
