@@ -14,9 +14,6 @@ const FlashcardDeck = ({ cards, onRestart, onClose }) => {
   // Track per-card status in-session only: 'unseen' | 'known' | 'review'
   const [statuses, setStatuses] = useState(() => cards.map(() => "unseen"));
   const total = cards.length;
-  const done =
-    statuses.every((s) => s !== "unseen") && idx === total - 1;
-
   const knownCount = statuses.filter((s) => s === "known").length;
   const reviewCount = statuses.filter((s) => s === "review").length;
 
