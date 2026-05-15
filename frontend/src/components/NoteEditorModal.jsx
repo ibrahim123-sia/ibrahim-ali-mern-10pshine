@@ -1,7 +1,43 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Pin, Star, ChevronDown, Check } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  X,
+  Pin,
+  Star,
+  ChevronDown,
+  Check,
+  Palette,
+  ChevronUp,
+} from "lucide-react";
 import { useAppContext } from "../context/context.jsx";
 import TagInput from "./TagInput.jsx";
+import ColorPicker from "./customization/ColorPicker.jsx";
+import FontPicker, { FONT_FAMILY_MAP } from "./customization/FontPicker.jsx";
+import MoodPicker from "./customization/MoodPicker.jsx";
+import ChecklistEditor from "./customization/ChecklistEditor.jsx";
+import AutoSaveIndicator from "./customization/AutoSaveIndicator.jsx";
+
+const NOTE_COLOR_OPTIONS = [
+  "#fef3c7", // amber-100
+  "#fee2e2", // red-100
+  "#fce7f3", // pink-100
+  "#ddd6fe", // violet-200
+  "#dbeafe", // blue-100
+  "#d1fae5", // emerald-100
+  "#fef9c3", // yellow-100
+  "#e7e5e4", // stone-200
+];
+const TEXT_COLOR_OPTIONS = [
+  "#1c1917", // stone-900
+  "#7c2d12", // orange-900
+  "#9f1239", // rose-800
+  "#581c87", // purple-900
+  "#1e3a8a", // blue-900
+  "#064e3b", // emerald-900
+  "#365314", // lime-900
+  "#44403c", // stone-700
+];
+
+const AUTOSAVE_DEBOUNCE_MS = 1200;
 
 const CategorySelect = ({ value, onChange, categories, onManage }) => {
   const [open, setOpen] = useState(false);
@@ -96,17 +132,31 @@ const CategorySelect = ({ value, onChange, categories, onManage }) => {
 
 const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategories }) => {
   const { createNote, updateNote, categories, notes } = useAppContext();
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState(null);
   const [tags, setTags] = useState([]);
   const [pinned, setPinned] = useState(false);
   const [favorite, setFavorite] = useState(false);
+  const [noteColor, setNoteColor] = useState("");
+  const [textColor, setTextColor] = useState("");
+  const [fontStyle, setFontStyle] = useState("sans");
+  const [checklist, setChecklist] = useState([]);
+  const [moodLabel, setMoodLabel] = useState("");
+  const [showCustomize, setShowCustomize] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const titleRef = useRef(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState("idle");
+  const [autoSaveError, setAutoSaveError] = useState(null);
 
-  // Tag suggestions from all existing notes' tags
+  const titleRef = useRef(null);
+  const autosaveTimer = useRef(null);
+  const savedStatusTimer = useRef(null);
+  const noteIdRef = useRef(null);
+  const initialLoadRef = useRef(true);
+
   const tagSuggestions = useMemo(() => {
     const set = new Set();
     for (const n of notes || []) {
@@ -117,15 +167,32 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
 
   useEffect(() => {
     if (!open) return;
+    initialLoadRef.current = true;
+    noteIdRef.current = note?._id || null;
     setTitle(note?.title || "");
     setContent(note?.content || "");
     setCategory(note?.category || null);
     setTags(note?.tags || []);
     setPinned(!!note?.pinned);
     setFavorite(!!note?.favorite);
+    setNoteColor(note?.noteColor || "");
+    setTextColor(note?.textColor || "");
+    setFontStyle(note?.fontStyle || "sans");
+    setChecklist(note?.checklist || []);
+    setMoodLabel(note?.moodLabel || "");
+    setShowCustomize(false);
     setError(null);
     setSaving(false);
-    setTimeout(() => titleRef.current?.focus(), 50);
+    setAutoSaveStatus("idle");
+    setAutoSaveError(null);
+    setTimeout(() => {
+      titleRef.current?.focus();
+      initialLoadRef.current = false;
+    }, 50);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      if (savedStatusTimer.current) clearTimeout(savedStatusTimer.current);
+    };
   }, [open, note]);
 
   useEffect(() => {
@@ -137,30 +204,96 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const buildPayload = useCallback(
+    () => ({
+      title: title.trim() || "Untitled",
+      content: content.trim(),
+      category,
+      tags,
+      pinned,
+      favorite,
+      noteColor,
+      textColor,
+      fontStyle,
+      checklist: checklist.filter((i) => i.text.trim().length > 0 || i.done),
+      moodLabel,
+    }),
+    [
+      title,
+      content,
+      category,
+      tags,
+      pinned,
+      favorite,
+      noteColor,
+      textColor,
+      fontStyle,
+      checklist,
+      moodLabel,
+    ]
+  );
+
+  // Auto-save: only in edit mode, only after the initial form-load completes
+  useEffect(() => {
+    if (!open) return;
+    if (mode !== "edit" || !noteIdRef.current) return;
+    if (initialLoadRef.current) return;
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      const trimmedTitle = title.trim();
+      const trimmedContent = content.trim();
+      if (!trimmedTitle && !trimmedContent && checklist.length === 0) return;
+      setAutoSaveStatus("saving");
+      setAutoSaveError(null);
+      try {
+        await updateNote(noteIdRef.current, buildPayload());
+        setAutoSaveStatus("saved");
+        if (savedStatusTimer.current) clearTimeout(savedStatusTimer.current);
+        savedStatusTimer.current = setTimeout(() => setAutoSaveStatus("idle"), 1800);
+      } catch (err) {
+        setAutoSaveStatus("error");
+        setAutoSaveError(err?.message || "Save failed");
+      }
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+  }, [
+    open,
+    mode,
+    title,
+    content,
+    category,
+    tags,
+    pinned,
+    favorite,
+    noteColor,
+    textColor,
+    fontStyle,
+    checklist,
+    moodLabel,
+    buildPayload,
+    updateNote,
+  ]);
+
   if (!open) return null;
 
   const handleSave = async () => {
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
-    if (!trimmedTitle && !trimmedContent) {
-      setError("A title or some content is required.");
+    if (!trimmedTitle && !trimmedContent && checklist.length === 0) {
+      setError("A title, some content, or a checklist item is required.");
       return;
     }
     setSaving(true);
     setError(null);
-    const payload = {
-      title: trimmedTitle || "Untitled",
-      content: trimmedContent,
-      category,
-      tags,
-      pinned,
-      favorite,
-    };
     try {
       if (mode === "edit" && note?._id) {
-        await updateNote(note._id, payload);
+        await updateNote(note._id, buildPayload());
       } else {
-        await createNote(payload);
+        await createNote(buildPayload());
       }
       onClose();
     } catch (err) {
@@ -170,19 +303,42 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     }
   };
 
+  const fontFamily = FONT_FAMILY_MAP[fontStyle] || FONT_FAMILY_MAP.sans;
+  const modalBg = noteColor ? { backgroundColor: noteColor } : undefined;
+  const titleColorStyle = textColor ? { color: textColor } : undefined;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 animate-fade-in">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white dark:bg-stone-800 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-700 animate-scale-in">
+      <div
+        className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-700 animate-scale-in bg-white dark:bg-stone-800 overflow-hidden"
+        style={modalBg}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-700">
-          <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-            {mode === "edit" ? "Edit Note" : "New Note"}
-          </h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200/70 dark:border-stone-700/70 bg-white/40 dark:bg-stone-900/30 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+              {mode === "edit" ? "Edit Note" : "New Note"}
+            </h2>
+            <AutoSaveIndicator status={autoSaveStatus} error={autoSaveError} />
+          </div>
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setShowCustomize((v) => !v)}
+              className={`p-1.5 rounded transition ${
+                showCustomize
+                  ? "text-amber-600 bg-amber-50 dark:bg-amber-900/30"
+                  : "text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700"
+              }`}
+              title="Customize appearance"
+              aria-pressed={showCustomize}
+            >
+              <Palette className="w-4 h-4" />
+            </button>
             <button
               type="button"
               onClick={() => setPinned((v) => !v)}
@@ -219,6 +375,42 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
           </div>
         </div>
 
+        {showCustomize && (
+          <div className="px-6 py-4 border-b border-stone-200/70 dark:border-stone-700/70 bg-white/40 dark:bg-stone-900/30 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                Appearance
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowCustomize(false)}
+                className="p-1 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+                aria-label="Hide customization"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <ColorPicker
+                label="Note color"
+                value={noteColor}
+                onChange={setNoteColor}
+                options={NOTE_COLOR_OPTIONS}
+              />
+              <ColorPicker
+                label="Title color"
+                value={textColor}
+                onChange={setTextColor}
+                options={TEXT_COLOR_OPTIONS}
+              />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <FontPicker value={fontStyle} onChange={setFontStyle} />
+              <MoodPicker value={moodLabel} onChange={setMoodLabel} />
+            </div>
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <input
@@ -227,8 +419,8 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Note title"
-            className="w-full text-2xl font-semibold bg-transparent border-0 focus:outline-none text-stone-800 dark:text-stone-100 placeholder:text-stone-300 dark:placeholder:text-stone-600"
-            style={{ fontFamily: "Georgia, serif" }}
+            className="w-full text-2xl font-semibold bg-transparent border-0 focus:outline-none placeholder:text-stone-300 dark:placeholder:text-stone-600"
+            style={{ ...titleColorStyle, fontFamily }}
           />
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -259,9 +451,13 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Start writing…"
-            rows={12}
+            rows={8}
             className="w-full bg-transparent border-0 focus:outline-none resize-none text-stone-700 dark:text-stone-200 placeholder:text-stone-300 dark:placeholder:text-stone-600 leading-relaxed"
+            style={{ fontFamily }}
           />
+
+          <ChecklistEditor value={checklist} onChange={setChecklist} />
+
           {error && (
             <div className="text-sm text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
               {error}
@@ -270,24 +466,28 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-stone-200 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-900/40 rounded-b-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-stone-200/70 dark:border-stone-700/70 bg-stone-50/70 dark:bg-stone-900/40">
           <p className="text-xs text-stone-400 dark:text-stone-500">
-            Rich formatting comes in a separate PR
+            {mode === "edit"
+              ? "Changes auto-save while you type"
+              : "Click Create note to save"}
           </p>
           <div className="flex gap-2">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition"
             >
-              Cancel
+              {mode === "edit" ? "Done" : "Cancel"}
             </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 rounded-lg shadow-sm transition"
-            >
-              {saving ? "Saving…" : mode === "edit" ? "Save changes" : "Create note"}
-            </button>
+            {mode !== "edit" && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 rounded-lg shadow-sm transition"
+              >
+                {saving ? "Saving…" : "Create note"}
+              </button>
+            )}
           </div>
         </div>
       </div>
