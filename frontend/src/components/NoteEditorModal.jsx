@@ -7,6 +7,7 @@ import {
   Check,
   Palette,
   ChevronUp,
+  Sparkles,
 } from "lucide-react";
 import { useAppContext } from "../context/context.jsx";
 import TagInput from "./TagInput.jsx";
@@ -15,6 +16,7 @@ import FontPicker, { FONT_FAMILY_MAP } from "./customization/FontPicker.jsx";
 import MoodPicker from "./customization/MoodPicker.jsx";
 import ChecklistEditor from "./customization/ChecklistEditor.jsx";
 import AutoSaveIndicator from "./customization/AutoSaveIndicator.jsx";
+import SmartPanel from "./smart/SmartPanel.jsx";
 
 const NOTE_COLOR_OPTIONS = [
   "#fef3c7", // amber-100
@@ -145,6 +147,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
   const [checklist, setChecklist] = useState([]);
   const [moodLabel, setMoodLabel] = useState("");
   const [showCustomize, setShowCustomize] = useState(false);
+  const [showSmart, setShowSmart] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -181,6 +184,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     setChecklist(note?.checklist || []);
     setMoodLabel(note?.moodLabel || "");
     setShowCustomize(false);
+    setShowSmart(false);
     setError(null);
     setSaving(false);
     setAutoSaveStatus("idle");
@@ -328,6 +332,19 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={() => setShowSmart((v) => !v)}
+              className={`p-1.5 rounded transition ${
+                showSmart
+                  ? "text-amber-600 bg-amber-50 dark:bg-amber-900/30"
+                  : "text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700"
+              }`}
+              title="Smart suggestions (AI)"
+              aria-pressed={showSmart}
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => setShowCustomize((v) => !v)}
               className={`p-1.5 rounded transition ${
                 showCustomize
@@ -374,6 +391,20 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
             </button>
           </div>
         </div>
+
+        {showSmart && (
+          <SmartPanel
+            title={title}
+            content={content}
+            onApplyTitle={(t) => setTitle(t)}
+            onApplySummary={(s) => setContent((c) => (c ? `${s}\n\n${c}` : s))}
+            onApplyTags={(newTags) =>
+              setTags((prev) => Array.from(new Set([...prev, ...newTags])))
+            }
+            onApplyCategory={(id) => setCategory(id)}
+            onCreateAndApplyCategory={(id) => setCategory(id)}
+          />
+        )}
 
         {showCustomize && (
           <div className="px-6 py-4 border-b border-stone-200/70 dark:border-stone-700/70 bg-white/40 dark:bg-stone-900/30 space-y-3 animate-fade-in">

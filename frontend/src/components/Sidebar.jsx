@@ -22,6 +22,7 @@ import { useTheme } from "../context/ThemeContext.jsx";
 import { useNavigate } from "react-router-dom";
 import Logo from "./Logo.jsx";
 import CategoryManagerModal from "./CategoryManagerModal.jsx";
+import SearchSuggestions, { recordSearch } from "./SearchSuggestions.jsx";
 
 const FILTER_CHIPS = [
   { key: "all", label: "All Notes", icon: Inbox },
@@ -43,12 +44,14 @@ const Sidebar = ({
   onCategoryFilter,
   tagFilter,
   onTagFilter,
+  onPickNote,
 }) => {
   const { user, logoutUser, notes, categories } = useAppContext();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showCategoryMgr, setShowCategoryMgr] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -186,18 +189,62 @@ const Sidebar = ({
         {/* Search */}
         <div className="px-5 pb-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
+              onChange={(e) => {
+                onSearchChange(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && searchQuery.trim()) {
+                  recordSearch(searchQuery);
+                  setShowSuggestions(false);
+                } else if (e.key === "Escape") {
+                  setShowSuggestions(false);
+                }
+              }}
               placeholder="Search notes…"
               className="w-full pl-9 pr-9 py-2 text-sm bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-stone-800 dark:text-stone-100 placeholder:text-stone-400"
             />
-            <kbd className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 items-center text-[10px] text-stone-400 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 bg-stone-50 dark:bg-stone-900">
+            <kbd className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 items-center text-[10px] text-stone-400 border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 bg-stone-50 dark:bg-stone-900 pointer-events-none">
               Ctrl K
             </kbd>
+            {showSuggestions && (
+              <SearchSuggestions
+                query={searchQuery}
+                notes={notes}
+                categories={categories}
+                onPickNote={(n) => {
+                  recordSearch(searchQuery);
+                  onPickNote?.(n);
+                  setShowSuggestions(false);
+                }}
+                onPickCategory={(c) => {
+                  onCategoryFilter(c._id);
+                  onTagFilter(null);
+                  onFilterChange("all");
+                  setShowSuggestions(false);
+                  onSearchChange("");
+                }}
+                onPickTag={(t) => {
+                  onTagFilter(t);
+                  onCategoryFilter(null);
+                  onFilterChange("all");
+                  setShowSuggestions(false);
+                  onSearchChange("");
+                }}
+                onPickRecent={(q) => {
+                  onSearchChange(q);
+                  recordSearch(q);
+                  setShowSuggestions(false);
+                }}
+                onClose={() => setShowSuggestions(false)}
+              />
+            )}
           </div>
         </div>
 
