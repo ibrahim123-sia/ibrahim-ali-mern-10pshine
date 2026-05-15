@@ -1,5 +1,6 @@
 import express from "express"
 import cors from "cors"
+import path from "path"
 import connectedDB from "./configs/db.js"
 import dotenv from "dotenv"
 import pinoHttp from 'pino-http'
@@ -13,6 +14,9 @@ connectedDB()
 app.use(pinoHttp({logger}))
 app.use(cors())
 app.use(express.json())
+
+// Serve uploaded files (avatars, etc.)
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))
 
 app.use("/api/users", userRouter)
 app.use("/api", noteRouter)
