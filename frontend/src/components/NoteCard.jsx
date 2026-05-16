@@ -306,6 +306,13 @@ const NoteCard = ({
   const isArchived = !!note.archived && !isTrash;
   const editable = !isTrash;
 
+  // AI Study (flashcards + quiz) is only relevant for study material,
+  // so only show it on notes filed under the "Study" category.
+  const noteCategory = categories.find((c) => c._id === note.category);
+  const isStudyCategory =
+    !!noteCategory && noteCategory.name.toLowerCase() === "study";
+  const studyHandler = isStudyCategory ? onStudy : undefined;
+
   const handleCardClick = () => {
     if (!editable) return;
     onEdit(note);
@@ -350,7 +357,7 @@ const NoteCard = ({
           onUnarchive={onUnarchive}
           onRestore={onRestore}
           onPermanentDelete={onPermanentDelete}
-          onStudy={onStudy}
+          onStudy={studyHandler}
         />
       </div>
     );
@@ -412,7 +419,7 @@ const NoteCard = ({
           onUnarchive={onUnarchive}
           onRestore={onRestore}
           onPermanentDelete={onPermanentDelete}
-          onStudy={onStudy}
+          onStudy={studyHandler}
         />
       </div>
     );
@@ -472,7 +479,7 @@ const NoteCard = ({
         onUnarchive={onUnarchive}
         onRestore={onRestore}
         onPermanentDelete={onPermanentDelete}
-        onStudy={onStudy}
+        onStudy={studyHandler}
       />
     </div>
   );
