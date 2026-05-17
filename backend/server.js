@@ -1,11 +1,15 @@
 import express from "express"
 import cors from "cors"
+import path from "path"
 import connectedDB from "./configs/db.js"
 import dotenv from "dotenv"
 import pinoHttp from 'pino-http'
 import logger from "./configs/logger.js"
 import userRouter from "./routes/userRoute.js"
 import noteRouter from "./routes/noteRoutes.js"
+import categoryRouter from "./routes/categoryRoutes.js"
+import aiRouter from "./routes/aiRoutes.js"
+import voiceRouter from "./routes/voiceRoutes.js"
 dotenv.config()
 const PORT = process.env.PORT || 5000
 const app = express()
@@ -14,8 +18,14 @@ app.use(pinoHttp({logger}))
 app.use(cors())
 app.use(express.json())
 
+// Serve uploaded files (avatars, etc.)
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")))
+
 app.use("/api/users", userRouter)
 app.use("/api", noteRouter)
+app.use("/api", categoryRouter)
+app.use("/api", aiRouter)
+app.use("/api", voiceRouter)
 
 app.use((err, req, res, next) => {
     logger.error({err}, "unhandled error")
