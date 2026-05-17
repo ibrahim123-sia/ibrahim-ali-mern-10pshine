@@ -4,6 +4,7 @@ import { ThemeProvider } from "./context/ThemeContext.jsx";
 import ProtectedRoute from "./router/ProtectedRoute.jsx";
 import { LoginRoute, RegisterRoute } from "./router/AuthRoutes.jsx";
 import NotesPage from "./pages/NotesPage.jsx";
+import ProfilePage from "./pages/ProfilePage.jsx";
 
 const App = () => {
   return (
@@ -18,6 +19,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <NotesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
                 </ProtectedRoute>
               }
             />
