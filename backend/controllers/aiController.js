@@ -8,6 +8,8 @@ const stripHtml = (s = "") =>
 const truncate = (s, n = MAX_CONTENT_CHARS) =>
     s.length > n ? s.slice(0, n) + " […truncated]" : s;
 
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Number(n) || lo));
+
 // Single endpoint with a `what` discriminator keeps the surface small
 // and lets the frontend call several suggestions in parallel.
 export const suggest = async (req, res) => {
@@ -109,5 +111,126 @@ export const suggest = async (req, res) => {
         return res
             .status(error.status || 500)
             .json({ message: error.message || "AI suggestion failed" });
+    }
+};
+
+// ---------------- FLASHCARDS ----------------
+export const generateFlashcards = async (req, res) => {
+    try {
+        const { content = "", title = "" } = req.body;
+        const count = clamp(req.body.count, 4, 16);
+        const text = truncate(stripHtml(content));
+        if (!text) {
+            return res.status(400).json({ message: "Content is required" });
+        }
+
+        const raw = await chatCompletion({
+            system:
+                "You generate study flashcards from a single note. Respond with ONLY a JSON object of the form " +
+                '{"cards": [{"front": "question or term", "back": "concise answer"}]}. ' +
+                "Rules:\n" +
+                "- front: a single question, term, or concept (max 120 chars)\n" +
+                "- back: the answer or definition (max 280 chars)\n" +
+                "- Cover distinct ideas; do not duplicate.\n" +
+                "- Use plain text only (no markdown, no html).",
+            user: `Generate exactly ${count} flashcards from this note.\n\nTitle: "${title}"\n\nContent:\n${text}`,
+            temperature: 0.4,
+            maxTokens: 1500,
+            json: true,
+        });
+        const parsed = parseJsonContent(raw);
+        const cards = Array.isArray(parsed?.cards)
+            ? parsed.cards
+                .filter((c) => c && typeof c.front === "string" && typeof c.back === "string")
+                .map((c) => ({
+                    front: c.front.trim().slice(0, 200),
+                    back: c.back.trim().slice(0, 400),
+                }))
+                .filter((c) => c.front.length > 0 && c.back.length > 0)
+                .slice(0, count)
+            : [];
+        if (cards.length === 0) {
+            return res.status(422).json({
+                message: "The model didn't return usable flashcards. Try again or expand the note.",
+            });
+        }
+        return res.json({ cards });
+    } catch (error) {
+        logger.error(
+            { err: error, userId: req.user?._id?.toString() },
+            "ai flashcards failed"
+        );
+        return res
+            .status(error.status || 500)
+            .json({ message: error.message || "Flashcard generation failed" });
+    }
+};
+
+// ---------------- QUIZ ----------------
+export const generateQuiz = async (req, res) => {
+    try {
+        const { content = "", title = "" } = req.body;
+        const count = clamp(req.body.count, 3, 12);
+        const text = truncate(stripHtml(content));
+        if (!text) {
+            return res.status(400).json({ message: "Content is required" });
+        }
+
+        const raw = await chatCompletion({
+            system:
+                "You generate multiple-choice study quizzes from a single note. Respond with ONLY a JSON object of the form " +
+                '{"questions": [{"question": "...", "options": ["a","b","c","d"], "correctIndex": 0, "explanation": "..."}]}. ' +
+                "Rules:\n" +
+                "- Exactly 4 options per question\n" +
+                "- correctIndex is the 0-based index into options\n" +
+                "- Options must be distinct\n" +
+                "- explanation (max 200 chars) briefly justifies the correct answer\n" +
+                "- Use only information from the note; do not invent facts\n" +
+                "- Plain text only (no markdown, no html)",
+            user: `Write exactly ${count} multiple-choice questions from this note.\n\nTitle: "${title}"\n\nContent:\n${text}`,
+            temperature: 0.4,
+            maxTokens: 2200,
+            json: true,
+        });
+        const parsed = parseJsonContent(raw);
+        const questions = Array.isArray(parsed?.questions)
+            ? parsed.questions
+                .filter(
+                    (q) =>
+                        q &&
+                        typeof q.question === "string" &&
+                        Array.isArray(q.options) &&
+                        q.options.length === 4 &&
+                        q.options.every((o) => typeof o === "string") &&
+                        Number.isInteger(q.correctIndex) &&
+                        q.correctIndex >= 0 &&
+                        q.correctIndex < 4
+                )
+                .map((q) => ({
+                    question: q.question.trim().slice(0, 300),
+                    options: q.options.map((o) => o.trim().slice(0, 200)),
+                    correctIndex: q.correctIndex,
+                    explanation:
+                        typeof q.explanation === "string"
+                            ? q.explanation.trim().slice(0, 300)
+                            : "",
+                }))
+                .filter((q) => q.question.length > 0 && new Set(q.options).size === 4)
+                .slice(0, count)
+            : [];
+        if (questions.length === 0) {
+            return res.status(422).json({
+                message: "The model didn't return usable quiz questions. Try again or expand the note.",
+            });
+        }
+        return res.json({ questions });
+    } catch (error) {
+        logger.error(
+            { err: error, userId: req.user?._id?.toString() },
+            "ai quiz failed"
+        );
+        return res
+            .status(error.status || 500)
+            .json({ message: error.message || "Quiz generation failed" });
     }
 };
