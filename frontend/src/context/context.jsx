@@ -104,6 +104,66 @@ export const AppProvider = ({ children }) => {
     }
   }, [api]);
 
+  const updateProfile = useCallback(
+    async ({ name, theme }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const payload = {};
+        if (typeof name === "string") payload.name = name;
+        if (typeof theme === "string") payload.theme = theme;
+        const { data } = await api.put("/users/profile", payload);
+        setUser(data);
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  const changePassword = useCallback(
+    async ({ currentPassword, newPassword }) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.put("/users/password", {
+          currentPassword,
+          newPassword,
+        });
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
+  const uploadAvatar = useCallback(
+    async (file) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const form = new FormData();
+        form.append("avatar", file);
+        const { data } = await api.post("/users/avatar", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setUser(data);
+        return data;
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api]
+  );
+
   // ---------------- NOTE APIs ----------------
   const createNote = useCallback(
     async (payload) => {
@@ -276,6 +336,9 @@ export const AppProvider = ({ children }) => {
     loginUser,
     logoutUser,
     fetchProfile,
+    updateProfile,
+    changePassword,
+    uploadAvatar,
     createNote,
     getUserNotes,
     getNoteById,
