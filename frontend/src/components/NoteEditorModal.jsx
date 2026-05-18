@@ -9,6 +9,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useAppContext } from "../context/context.jsx";
+import { stripHtml } from "../utils/formatTime.js";
+import RichTextEditor from "./editor/RichTextEditor.jsx";
 import TagInput from "./TagInput.jsx";
 import ColorPicker from "./customization/ColorPicker.jsx";
 import FontPicker, { FONT_FAMILY_MAP } from "./customization/FontPicker.jsx";
@@ -17,24 +19,24 @@ import ChecklistEditor from "./customization/ChecklistEditor.jsx";
 import AutoSaveIndicator from "./customization/AutoSaveIndicator.jsx";
 
 const NOTE_COLOR_OPTIONS = [
-  "#fef3c7", // amber-100
-  "#fee2e2", // red-100
-  "#fce7f3", // pink-100
-  "#ddd6fe", // violet-200
-  "#dbeafe", // blue-100
-  "#d1fae5", // emerald-100
-  "#fef9c3", // yellow-100
-  "#e7e5e4", // stone-200
+  "#fef3c7",
+  "#fee2e2",
+  "#fce7f3",
+  "#ddd6fe",
+  "#dbeafe",
+  "#d1fae5",
+  "#fef9c3",
+  "#e7e5e4",
 ];
 const TEXT_COLOR_OPTIONS = [
-  "#1c1917", // stone-900
-  "#7c2d12", // orange-900
-  "#9f1239", // rose-800
-  "#581c87", // purple-900
-  "#1e3a8a", // blue-900
-  "#064e3b", // emerald-900
-  "#365314", // lime-900
-  "#44403c", // stone-700
+  "#1c1917",
+  "#7c2d12",
+  "#9f1239",
+  "#581c87",
+  "#1e3a8a",
+  "#064e3b",
+  "#365314",
+  "#44403c",
 ];
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
@@ -156,6 +158,11 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
   const savedStatusTimer = useRef(null);
   const noteIdRef = useRef(null);
   const initialLoadRef = useRef(true);
+  const savingRef = useRef(false);
+
+  useEffect(() => {
+    savingRef.current = saving;
+  }, [saving]);
 
   const tagSuggestions = useMemo(() => {
     const set = new Set();
@@ -195,19 +202,10 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     };
   }, [open, note]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
   const buildPayload = useCallback(
     () => ({
       title: title.trim() || "Untitled",
-      content: content.trim(),
+      content,
       category,
       tags,
       pinned,
@@ -242,8 +240,8 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(async () => {
       const trimmedTitle = title.trim();
-      const trimmedContent = content.trim();
-      if (!trimmedTitle && !trimmedContent && checklist.length === 0) return;
+      const hasContent = stripHtml(content).length > 0;
+      if (!trimmedTitle && !hasContent && checklist.length === 0) return;
       setAutoSaveStatus("saving");
       setAutoSaveError(null);
       try {
@@ -278,12 +276,11 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     updateNote,
   ]);
 
-  if (!open) return null;
-
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
+    if (savingRef.current) return;
     const trimmedTitle = title.trim();
-    const trimmedContent = content.trim();
-    if (!trimmedTitle && !trimmedContent && checklist.length === 0) {
+    const hasContent = stripHtml(content).length > 0;
+    if (!trimmedTitle && !hasContent && checklist.length === 0) {
       setError("A title, some content, or a checklist item is required.");
       return;
     }
@@ -301,7 +298,25 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
     } finally {
       setSaving(false);
     }
-  };
+  }, [mode, note, createNote, updateNote, onClose, title, content, checklist, buildPayload]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose, handleSave]);
+
+  if (!open) return null;
 
   const fontFamily = FONT_FAMILY_MAP[fontStyle] || FONT_FAMILY_MAP.sans;
   const modalBg = noteColor ? { backgroundColor: noteColor } : undefined;
@@ -314,7 +329,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
         onClick={onClose}
       />
       <div
-        className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-700 animate-scale-in bg-white dark:bg-stone-800 overflow-hidden"
+        className="relative w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-700 animate-scale-in bg-white dark:bg-stone-800 overflow-hidden"
         style={modalBg}
       >
         {/* Header */}
@@ -412,7 +427,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
         )}
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4" style={{ fontFamily }}>
           <input
             ref={titleRef}
             type="text"
@@ -447,14 +462,7 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
             </div>
           </div>
 
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Start writing…"
-            rows={8}
-            className="w-full bg-transparent border-0 focus:outline-none resize-none text-stone-700 dark:text-stone-200 placeholder:text-stone-300 dark:placeholder:text-stone-600 leading-relaxed"
-            style={{ fontFamily }}
-          />
+          <RichTextEditor value={content} onChange={setContent} />
 
           <ChecklistEditor value={checklist} onChange={setChecklist} />
 
@@ -468,9 +476,20 @@ const NoteEditorModal = ({ open, mode = "create", note, onClose, onManageCategor
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-stone-200/70 dark:border-stone-700/70 bg-stone-50/70 dark:bg-stone-900/40">
           <p className="text-xs text-stone-400 dark:text-stone-500">
-            {mode === "edit"
-              ? "Changes auto-save while you type"
-              : "Click Create note to save"}
+            {mode === "edit" ? (
+              "Changes auto-save while you type"
+            ) : (
+              <>
+                <kbd className="border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-[10px] bg-white dark:bg-stone-800">
+                  Ctrl S
+                </kbd>{" "}
+                to save ·{" "}
+                <kbd className="border border-stone-200 dark:border-stone-700 rounded px-1.5 py-0.5 text-[10px] bg-white dark:bg-stone-800">
+                  Esc
+                </kbd>{" "}
+                to close
+              </>
+            )}
           </p>
           <div className="flex gap-2">
             <button
