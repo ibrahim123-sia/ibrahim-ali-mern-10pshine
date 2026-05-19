@@ -253,13 +253,14 @@ const Sidebar = ({
           {/* Filter chips */}
           <section>
             <ul className="space-y-0.5">
-              {FILTER_CHIPS.map(({ key, label, icon: Icon }) => {
-                const active = filter === key && !categoryFilter && !tagFilter;
+              {FILTER_CHIPS.map((chip) => {
+                const active =
+                  filter === chip.key && !categoryFilter && !tagFilter;
                 return (
-                  <li key={key}>
+                  <li key={chip.key}>
                     <button
                       onClick={() => {
-                        onFilterChange(key);
+                        onFilterChange(chip.key);
                         onCategoryFilter(null);
                         onTagFilter(null);
                       }}
@@ -269,8 +270,8 @@ const Sidebar = ({
                           : "text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
                       }`}
                     >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span>{label}</span>
+                      <chip.icon className="w-4 h-4 shrink-0" />
+                      <span>{chip.label}</span>
                     </button>
                   </li>
                 );

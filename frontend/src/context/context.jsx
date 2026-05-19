@@ -334,6 +334,32 @@ export const AppProvider = ({ children }) => {
     [api]
   );
 
+  const generateFlashcards = useCallback(
+    async ({ content, title, count = 8 }) => {
+      setError(null);
+      try {
+        const { data } = await api.post("/ai/flashcards", { content, title, count });
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
+  const generateQuiz = useCallback(
+    async ({ content, title, count = 5 }) => {
+      setError(null);
+      try {
+        const { data } = await api.post("/ai/quiz", { content, title, count });
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
   // ---------------- VOICE ----------------
   const transcribeAudio = useCallback(
     async ({ file, mode = "cleanup" }) => {
@@ -411,6 +437,8 @@ export const AppProvider = ({ children }) => {
     suggestNote,
     reorderNotes,
     transcribeAudio,
+    generateFlashcards,
+    generateQuiz,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
