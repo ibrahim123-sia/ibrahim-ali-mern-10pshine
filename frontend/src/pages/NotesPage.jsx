@@ -29,6 +29,7 @@ import NoteEditorModal from "../components/NoteEditorModal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import SkeletonCard from "../components/SkeletonCard.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import StudyModeModal from "../components/study/StudyModeModal.jsx";
 import { stripHtml } from "../utils/formatTime.js";
 
 const VIEW_KEY = "nowrite-view";
@@ -58,6 +59,7 @@ const NotesPage = () => {
   const [editorState, setEditorState] = useState({ open: false, mode: "create", note: null });
   const [confirmTrash, setConfirmTrash] = useState(null);
   const [confirmHardDelete, setConfirmHardDelete] = useState(null);
+  const [studyNote, setStudyNote] = useState(null);
   const [firstLoad, setFirstLoad] = useState(true);
   const [filter, setFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState(null);
@@ -363,6 +365,7 @@ const NotesPage = () => {
                       onUnarchive={unarchiveNote}
                       onRestore={restoreNote}
                       onPermanentDelete={(n) => setConfirmHardDelete(n)}
+                      onStudy={(n) => setStudyNote(n)}
                     />
                   ))}
                 </div>
@@ -384,6 +387,7 @@ const NotesPage = () => {
                   onUnarchive={unarchiveNote}
                   onRestore={restoreNote}
                   onPermanentDelete={(n) => setConfirmHardDelete(n)}
+                  onStudy={(n) => setStudyNote(n)}
                 />
               ))}
             </div>
@@ -416,6 +420,13 @@ const NotesPage = () => {
         danger
         onConfirm={handleMoveToTrash}
         onCancel={() => setConfirmTrash(null)}
+      />
+
+      <StudyModeModal
+        key={studyNote?._id || "study-closed"}
+        open={!!studyNote}
+        note={studyNote}
+        onClose={() => setStudyNote(null)}
       />
 
       <ConfirmDialog

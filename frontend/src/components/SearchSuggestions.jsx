@@ -41,12 +41,15 @@ const SearchSuggestions = ({
   onPickRecent,
   onClose,
 }) => {
-  const [recents, setRecents] = useState(() => readRecent());
+  // Read recents fresh each render — keeps in sync with recordSearch writes
+  // from anywhere in the app. `tick` is bumped after a write here so the
+  // component re-renders even when query hasn't changed.
+  const [, setTick] = useState(0);
+  // localStorage read is cheap; running on every render keeps us
+  // in sync with recordSearch writes from elsewhere. `tick` forces
+  // a re-render after clearRecents so the panel updates immediately.
+  const recents = readRecent();
   const ref = useRef(null);
-
-  useEffect(() => {
-    setRecents(readRecent());
-  }, [query]);
 
   useEffect(() => {
     const onDoc = (e) => {
@@ -97,7 +100,7 @@ const SearchSuggestions = ({
 
   const clearRecents = () => {
     writeRecent([]);
-    setRecents([]);
+    setTick((n) => n + 1);
   };
 
   return (
