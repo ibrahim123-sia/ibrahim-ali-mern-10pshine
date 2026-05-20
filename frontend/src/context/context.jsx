@@ -315,6 +315,91 @@ export const AppProvider = ({ children }) => {
     [api]
   );
 
+  // ---------------- AI APIs ----------------
+  const suggestNote = useCallback(
+    async ({ what, content, title, categories: cats }) => {
+      setError(null);
+      try {
+        const { data } = await api.post("/ai/suggest", {
+          what,
+          content,
+          title,
+          categories: cats,
+        });
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
+  const generateFlashcards = useCallback(
+    async ({ content, title, count = 8 }) => {
+      setError(null);
+      try {
+        const { data } = await api.post("/ai/flashcards", { content, title, count });
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
+  const generateQuiz = useCallback(
+    async ({ content, title, count = 5 }) => {
+      setError(null);
+      try {
+        const { data } = await api.post("/ai/quiz", { content, title, count });
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
+  // ---------------- VOICE ----------------
+  const transcribeAudio = useCallback(
+    async ({ file, mode = "cleanup" }) => {
+      setError(null);
+      try {
+        const form = new FormData();
+        form.append("audio", file);
+        form.append("mode", mode);
+        const { data } = await api.post("/voice/transcribe", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return data;
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
+  // ---------------- REORDER ----------------
+  const reorderNotes = useCallback(
+    async (ids) => {
+      // Optimistic local sort so the UI feels instant
+      setNotes((prev) => {
+        const idx = new Map(ids.map((id, i) => [id, i]));
+        return [...prev]
+          .map((n) =>
+            idx.has(n._id) ? { ...n, order: idx.get(n._id) } : n
+          )
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      });
+      try {
+        await api.post("/notes/reorder", { ids });
+      } catch (err) {
+        handleError(err);
+      }
+    },
+    [api]
+  );
+
   useEffect(() => {
     if (token && !user) {
       fetchProfile().catch(() => {
@@ -349,6 +434,11 @@ export const AppProvider = ({ children }) => {
     createCategory,
     updateCategory,
     deleteCategory,
+    suggestNote,
+    reorderNotes,
+    transcribeAudio,
+    generateFlashcards,
+    generateQuiz,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
