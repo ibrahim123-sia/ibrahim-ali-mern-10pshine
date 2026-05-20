@@ -323,9 +323,9 @@ const NoteCard = ({
       <div
         onClick={handleCardClick}
         style={buildCardStyle(note)}
-        className={`group flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg hover:shadow-sm hover:border-amber-300 dark:hover:border-amber-700 transition ${
+        className={`group relative flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg hover:shadow-sm hover:border-amber-300 dark:hover:border-amber-700 transition ${
           editable ? "cursor-pointer" : "opacity-75"
-        }`}
+        } ${menuOpen ? "z-20" : ""}`}
       >
         <div className="flex items-center gap-1.5 shrink-0">
           {note.pinned && <Pin className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />}
@@ -370,7 +370,7 @@ const NoteCard = ({
         style={buildCardStyle(note)}
         className={`group relative flex items-start gap-4 p-4 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700 transition ${
           editable ? "cursor-pointer" : "opacity-75"
-        }`}
+        } ${menuOpen ? "z-20" : ""}`}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -432,7 +432,7 @@ const NoteCard = ({
       style={buildCardStyle(note)}
       className={`group relative flex flex-col p-5 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl hover:shadow-lg hover:-translate-y-0.5 hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-200 min-h-[180px] ${
         editable ? "cursor-pointer" : "opacity-75"
-      }`}
+      } ${menuOpen ? "z-20" : ""}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2 pr-6">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
