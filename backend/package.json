@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "test": "cross-env NODE_ENV=test mocha --recursive --timeout 30000 \"tests/**/*.test.js\"",
+    "test:coverage": "cross-env NODE_ENV=test c8 --all --reporter=text --reporter=text-summary --reporter=lcov --include=controllers --include=middlewares --include=models --include=routes --include=configs --exclude=tests --exclude=coverage mocha --recursive --timeout 30000 \"tests/**/*.test.js\"",
     "start": "node server.js"
   },
   "keywords": [],
@@ -24,6 +25,7 @@
     "pino-pretty": "^11.3.0"
   },
   "devDependencies": {
+    "c8": "^11.0.0",
     "chai": "^6.2.2",
     "cross-env": "^10.1.0",
     "mocha": "^11.7.5",
