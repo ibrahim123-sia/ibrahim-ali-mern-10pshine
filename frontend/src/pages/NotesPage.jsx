@@ -6,13 +6,30 @@ import {
   List as ListIcon,
   Rows3,
 } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { useAppContext } from "../context/context.jsx";
 import Sidebar from "../components/Sidebar.jsx";
 import NoteCard from "../components/NoteCard.jsx";
+import SortableNoteCard from "../components/SortableNoteCard.jsx";
 import NoteEditorModal from "../components/NoteEditorModal.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import SkeletonCard from "../components/SkeletonCard.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import StudyModeModal from "../components/study/StudyModeModal.jsx";
 import { stripHtml } from "../utils/formatTime.js";
 
 const VIEW_KEY = "nowrite-view";
@@ -33,21 +50,23 @@ const NotesPage = () => {
     getCategories,
     deleteNote,
     patchNote,
+    reorderNotes,
     loading,
   } = useAppContext();
   const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) || "grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [editorState, setEditorState] = useState({ open: false, mode: "create", note: null });
-  const [confirmTrash, setConfirmTrash] = useState(null); // soft-delete confirmation
-  const [confirmHardDelete, setConfirmHardDelete] = useState(null); // permanent delete
+  const [confirmTrash, setConfirmTrash] = useState(null);
+  const [confirmHardDelete, setConfirmHardDelete] = useState(null);
+  const [studyNote, setStudyNote] = useState(null);
   const [firstLoad, setFirstLoad] = useState(true);
   const [filter, setFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState(null);
   const [tagFilter, setTagFilter] = useState(null);
+  const [dragOrder, setDragOrder] = useState(null); // ephemeral order while dragging
   const searchInputRef = useRef(null);
 
-  // Initial fetch (notes + categories)
   useEffect(() => {
     Promise.all([
       getUserNotes().catch(() => {}),
@@ -90,7 +109,6 @@ const NotesPage = () => {
     setEditorState((s) => ({ ...s, open: false }));
   }, []);
 
-  // Soft delete (move to trash) — used for non-trash notes
   const handleMoveToTrash = async () => {
     if (!confirmTrash?._id) return;
     try {
@@ -102,7 +120,6 @@ const NotesPage = () => {
     }
   };
 
-  // Permanent delete (from Trash)
   const handlePermanentDelete = async () => {
     if (!confirmHardDelete?._id) return;
     try {
@@ -141,25 +158,19 @@ const NotesPage = () => {
       const inTrash = !!n.deletedAt;
       const isArchived = !!n.archived;
 
-      // Apply primary filter
       if (filter === "trash") {
         if (!inTrash) return false;
       } else if (filter === "archived") {
         if (inTrash || !isArchived) return false;
       } else {
-        // For all/pinned/favorites: exclude trash + archived
         if (inTrash || isArchived) return false;
         if (filter === "pinned" && !n.pinned) return false;
         if (filter === "favorites" && !n.favorite) return false;
       }
 
-      // Category filter (active in conjunction with primary)
       if (categoryFilter && n.category !== categoryFilter) return false;
-
-      // Tag filter
       if (tagFilter && !(n.tags || []).includes(tagFilter)) return false;
 
-      // Search filter
       if (q) {
         const inTitle = (n.title || "").toLowerCase().includes(q);
         const inContent = stripHtml(n.content || "").toLowerCase().includes(q);
@@ -169,10 +180,17 @@ const NotesPage = () => {
       return true;
     });
 
-    // Sort: pinned first (in non-trash views), then by updatedAt desc
     return list.sort((a, b) => {
       if (filter !== "trash") {
         if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+      }
+      // honor custom order when both have it set (>0); otherwise fall back to time
+      const aHasOrder = typeof a.order === "number" && a.order > 0;
+      const bHasOrder = typeof b.order === "number" && b.order > 0;
+      if (aHasOrder || bHasOrder) {
+        const ao = a.order ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.order ?? Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
       }
       const aT = new Date(a.updatedAt || a.createdAt || 0).getTime();
       const bT = new Date(b.updatedAt || b.createdAt || 0).getTime();
@@ -190,6 +208,49 @@ const NotesPage = () => {
   }, [filter, categoryFilter, tagFilter, categories]);
 
   const showSkeletons = firstLoad && loading;
+  const isTrashView = filter === "trash";
+
+  // DnD is enabled only in default views without an active search
+  // (reordering filtered subsets doesn't translate to a stable global order)
+  const dragEnabled =
+    !isTrashView &&
+    !searchQuery.trim() &&
+    !categoryFilter &&
+    !tagFilter &&
+    filter === "all";
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // Compute the visible array honoring an in-flight drag preview
+  const visibleNotes = useMemo(() => {
+    if (!dragOrder) return filteredNotes;
+    const byId = new Map(filteredNotes.map((n) => [n._id, n]));
+    return dragOrder.map((id) => byId.get(id)).filter(Boolean);
+  }, [filteredNotes, dragOrder]);
+
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) {
+      setDragOrder(null);
+      return;
+    }
+    const ids = (dragOrder || filteredNotes.map((n) => n._id));
+    const oldIdx = ids.indexOf(active.id);
+    const newIdx = ids.indexOf(over.id);
+    if (oldIdx < 0 || newIdx < 0) {
+      setDragOrder(null);
+      return;
+    }
+    const next = arrayMove(ids, oldIdx, newIdx);
+    setDragOrder(next);
+    reorderNotes(next).catch(() => {});
+  };
+
+  const sortingStrategy =
+    view === "grid" ? rectSortingStrategy : verticalListSortingStrategy;
+
   const gridCls =
     view === "grid"
       ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
@@ -197,7 +258,7 @@ const NotesPage = () => {
       ? "flex flex-col gap-3"
       : "flex flex-col gap-2";
 
-  const isTrashView = filter === "trash";
+  const visibleIds = visibleNotes.map((n) => n._id);
 
   return (
     <div className="flex h-screen bg-amber-50/40 dark:bg-stone-950 text-stone-800 dark:text-stone-100">
@@ -213,6 +274,7 @@ const NotesPage = () => {
         onCategoryFilter={setCategoryFilter}
         tagFilter={tagFilter}
         onTagFilter={setTagFilter}
+        onPickNote={openEdit}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -232,10 +294,13 @@ const NotesPage = () => {
               {pageTitle}
             </h1>
             <p className="text-xs text-stone-500 dark:text-stone-400">
-              {filteredNotes.length}{" "}
-              {filteredNotes.length === 1 ? "note" : "notes"}
+              {visibleNotes.length}{" "}
+              {visibleNotes.length === 1 ? "note" : "notes"}
               {searchQuery && (
                 <> matching "<span className="italic">{searchQuery}</span>"</>
+              )}
+              {dragEnabled && visibleNotes.length > 1 && (
+                <> · drag to reorder</>
               )}
             </p>
           </div>
@@ -270,14 +335,45 @@ const NotesPage = () => {
                 <SkeletonCard key={i} view={view} />
               ))}
             </div>
-          ) : filteredNotes.length === 0 ? (
+          ) : visibleNotes.length === 0 ? (
             <EmptyState
               hasQuery={!!searchQuery || !!categoryFilter || !!tagFilter || filter !== "all"}
               onCreate={openCreate}
             />
+          ) : dragEnabled ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+              onDragCancel={() => setDragOrder(null)}
+            >
+              <SortableContext items={visibleIds} strategy={sortingStrategy}>
+                <div className={gridCls}>
+                  {visibleNotes.map((note) => (
+                    <SortableNoteCard
+                      key={note._id}
+                      id={note._id}
+                      dragEnabled={!note.pinned}
+                      note={note}
+                      view={view}
+                      categories={categories}
+                      onEdit={openEdit}
+                      onDelete={(n) => setConfirmTrash(n)}
+                      onTogglePin={togglePin}
+                      onToggleFavorite={toggleFavorite}
+                      onArchive={archiveNote}
+                      onUnarchive={unarchiveNote}
+                      onRestore={restoreNote}
+                      onPermanentDelete={(n) => setConfirmHardDelete(n)}
+                      onStudy={(n) => setStudyNote(n)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           ) : (
             <div className={gridCls}>
-              {filteredNotes.map((note) => (
+              {visibleNotes.map((note) => (
                 <NoteCard
                   key={note._id}
                   note={note}
@@ -291,6 +387,7 @@ const NotesPage = () => {
                   onUnarchive={unarchiveNote}
                   onRestore={restoreNote}
                   onPermanentDelete={(n) => setConfirmHardDelete(n)}
+                  onStudy={(n) => setStudyNote(n)}
                 />
               ))}
             </div>
@@ -323,6 +420,13 @@ const NotesPage = () => {
         danger
         onConfirm={handleMoveToTrash}
         onCancel={() => setConfirmTrash(null)}
+      />
+
+      <StudyModeModal
+        key={studyNote?._id || "study-closed"}
+        open={!!studyNote}
+        note={studyNote}
+        onClose={() => setStudyNote(null)}
       />
 
       <ConfirmDialog
