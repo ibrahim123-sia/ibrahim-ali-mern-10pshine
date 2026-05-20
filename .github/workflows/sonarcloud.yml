@@ -39,8 +39,19 @@ jobs:
           JWT_SECRET: ci-test-secret
         run: npm run test:coverage
 
+      - name: Verify SONAR_TOKEN is set
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -n "${SONAR_TOKEN}" ]; then
+            echo "SONAR_TOKEN is set (length: ${#SONAR_TOKEN})"
+          else
+            echo "::error::SONAR_TOKEN secret is empty or missing in this repo"
+            exit 1
+          fi
+
       - name: SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
