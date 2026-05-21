@@ -1,11 +1,11 @@
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 import { chatCompletion } from "../configs/groq.js";
 import logger from "../configs/logger.js";
 
 const GROQ_TRANSCRIBE_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const WHISPER_MODEL = "whisper-large-v3";
-const VALID_MODES = ["cleanup", "summary", "raw"];
+const VALID_MODES = new Set(["cleanup", "summary", "raw"]);
 
 const removeFile = (p) => {
   if (!p) return;
@@ -58,7 +58,7 @@ export const transcribe = async (req, res) => {
     savedPath = req.file.path;
 
     const rawMode = String(req.body?.mode || "cleanup").toLowerCase();
-    const mode = VALID_MODES.includes(rawMode) ? rawMode : "cleanup";
+    const mode = VALID_MODES.has(rawMode) ? rawMode : "cleanup";
 
     // 1. Transcribe with Whisper
     const transcript = await transcribeWithGroq(savedPath, req.file.mimetype);

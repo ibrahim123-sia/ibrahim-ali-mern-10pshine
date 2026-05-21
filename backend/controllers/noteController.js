@@ -19,8 +19,8 @@ const ALLOWED_UPDATE_FIELDS = [
     'voiceNote',
 ];
 
-const FONT_STYLES = ['sans', 'serif', 'mono'];
-const MOOD_LABELS = ['', 'productive', 'study', 'idea', 'important'];
+const FONT_STYLES = new Set(['sans', 'serif', 'mono']);
+const MOOD_LABELS = new Set(['', 'productive', 'study', 'idea', 'important']);
 const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 const sanitizeCategory = (value) => {
@@ -73,9 +73,9 @@ const buildUpdate = (body) => {
             const sanitized = sanitizeColor(raw);
             if (sanitized !== undefined) update[key] = sanitized;
         } else if (key === 'fontStyle') {
-            if (FONT_STYLES.includes(raw)) update.fontStyle = raw;
+            if (FONT_STYLES.has(raw)) update.fontStyle = raw;
         } else if (key === 'moodLabel') {
-            if (MOOD_LABELS.includes(raw)) update.moodLabel = raw;
+            if (MOOD_LABELS.has(raw)) update.moodLabel = raw;
         } else if (key === 'checklist') {
             const sanitized = sanitizeChecklist(raw);
             if (sanitized !== undefined) update.checklist = sanitized;

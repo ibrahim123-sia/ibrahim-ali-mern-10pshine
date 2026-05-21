@@ -1,6 +1,6 @@
 import express from "express"
 import cors from "cors"
-import path from "path"
+import path from "node:path"
 import connectedDB from "./configs/db.js"
 import dotenv from "dotenv"
 import pinoHttp from 'pino-http'
@@ -13,9 +13,14 @@ import voiceRouter from "./routes/voiceRoutes.js"
 dotenv.config()
 const PORT = process.env.PORT || 5000
 const app = express()
+app.disable("x-powered-by")
 connectedDB()
 app.use(pinoHttp({logger}))
-app.use(cors())
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean)
+app.use(cors({ origin: allowedOrigins, credentials: true }))
 app.use(express.json())
 
 // Serve uploaded files (avatars, etc.)
