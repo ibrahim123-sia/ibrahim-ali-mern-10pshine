@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- NoWrite editor prose styles ---------- */
+.nowrite-prose {
+  color: theme('colors.stone.700');
+  line-height: 1.65;
+  font-size: 1rem;
+}
+.dark .nowrite-prose {
+  color: theme('colors.stone.200');
+}
+
+.nowrite-prose h1,
+.nowrite-prose h2,
+.nowrite-prose h3 {
+  font-family: Georgia, serif;
+  color: theme('colors.stone.800');
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+.dark .nowrite-prose h1,
+.dark .nowrite-prose h2,
+.dark .nowrite-prose h3 {
+  color: theme('colors.stone.100');
+}
+.nowrite-prose h1 { font-size: 1.75rem; }
+.nowrite-prose h2 { font-size: 1.4rem; }
+.nowrite-prose h3 { font-size: 1.15rem; }
+
+.nowrite-prose p {
+  margin: 0.5em 0;
+}
+
+.nowrite-prose strong { font-weight: 700; }
+.nowrite-prose em { font-style: italic; }
+.nowrite-prose u { text-decoration: underline; }
+.nowrite-prose s { text-decoration: line-through; }
+
+.nowrite-prose mark {
+  background-color: theme('colors.amber.200');
+  color: inherit;
+  padding: 0 0.15em;
+  border-radius: 0.2em;
+}
+.dark .nowrite-prose mark {
+  background-color: theme('colors.amber.500 / 35%');
+}
+
+.nowrite-prose ul,
+.nowrite-prose ol {
+  padding-left: 1.5rem;
+  margin: 0.5em 0;
+}
+.nowrite-prose ul { list-style: disc; }
+.nowrite-prose ol { list-style: decimal; }
+.nowrite-prose li { margin: 0.15em 0; }
+.nowrite-prose li > p { margin: 0; }
+
+.nowrite-prose blockquote {
+  border-left: 3px solid theme('colors.amber.300');
+  padding-left: 0.9rem;
+  color: theme('colors.stone.600');
+  font-style: italic;
+  margin: 0.75em 0;
+}
+.dark .nowrite-prose blockquote {
+  color: theme('colors.stone.400');
+  border-left-color: theme('colors.amber.700');
+}
+
+.nowrite-prose code {
+  background: theme('colors.stone.100');
+  color: theme('colors.amber.800');
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.dark .nowrite-prose code {
+  background: theme('colors.stone.900');
+  color: theme('colors.amber.300');
+}
+
+.nowrite-prose pre,
+.nowrite-prose .nowrite-code-block {
+  background: theme('colors.stone.900');
+  color: theme('colors.stone.100');
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  margin: 0.75em 0;
+}
+.nowrite-prose pre code,
+.nowrite-prose .nowrite-code-block code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.nowrite-prose a,
+.nowrite-prose .nowrite-link {
+  color: theme('colors.amber.700');
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nowrite-prose a:hover { color: theme('colors.amber.800'); }
+.dark .nowrite-prose a,
+.dark .nowrite-prose .nowrite-link {
+  color: theme('colors.amber.400');
+}
+
+/* Placeholder for empty editor */
+.nowrite-prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: theme('colors.stone.400');
+  pointer-events: none;
+  height: 0;
+  float: left;
+}
+.dark .nowrite-prose p.is-editor-empty:first-child::before {
+  color: theme('colors.stone.500');
+}
