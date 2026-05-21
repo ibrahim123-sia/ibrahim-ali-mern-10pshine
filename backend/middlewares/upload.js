@@ -1,6 +1,6 @@
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import path from "node:path";
+import fs from "node:fs";
 
 const AVATAR_DIR = path.join(process.cwd(), "uploads", "avatars");
 const VOICE_DIR = path.join(process.cwd(), "uploads", "voice");
