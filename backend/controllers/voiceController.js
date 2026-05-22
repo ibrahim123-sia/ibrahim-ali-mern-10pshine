@@ -26,8 +26,9 @@ const transcribeWithGroq = async (filePath, mimetype) => {
   const form = new FormData();
   form.append("file", blob, path.basename(filePath));
   form.append("model", WHISPER_MODEL);
-  form.append("response_format", "json");
+  form.append("response_format", "verbose_json");
   form.append("temperature", "0");
+  form.append("language", "en");
 
   const res = await fetch(GROQ_TRANSCRIBE_URL, {
     method: "POST",
@@ -46,7 +47,10 @@ const transcribeWithGroq = async (filePath, mimetype) => {
     throw err;
   }
   const data = await res.json();
-  return (data?.text || "").trim();
+  return {
+    text: (data?.text || "").trim(),
+    duration: typeof data?.duration === "number" ? data.duration : 0,
+  };
 };
 
 export const transcribe = async (req, res) => {
@@ -60,8 +64,11 @@ export const transcribe = async (req, res) => {
     const rawMode = String(req.body?.mode || "cleanup").toLowerCase();
     const mode = VALID_MODES.has(rawMode) ? rawMode : "cleanup";
 
-    // 1. Transcribe with Whisper
-    const transcript = await transcribeWithGroq(savedPath, req.file.mimetype);
+    // 1. Transcribe with Whisper (forced to English)
+    const { text: transcript } = await transcribeWithGroq(
+      savedPath,
+      req.file.mimetype
+    );
     if (!transcript) {
       return res.status(422).json({
         message: "We couldn't hear anything in the recording. Try again?",
@@ -73,18 +80,34 @@ export const transcribe = async (req, res) => {
     if (mode === "cleanup") {
       cleanedText = await chatCompletion({
         system:
-          "You are a careful copy editor. Take the raw voice-to-text transcript and rewrite it with correct spelling, grammar, and punctuation. Preserve the speaker's voice, meaning, and the order of ideas. Do NOT summarize or add information. Respond with ONLY the cleaned text — no preamble.",
+          "You are a strict transcription cleaner. Your ONLY job is to rewrite a raw English voice-to-text transcript with correct spelling, grammar, and punctuation.\n\n" +
+          "Hard rules:\n" +
+          "- Output in English only. If the transcript contains any non-English words or scripts, translate them into natural English. Never output any other language or script.\n" +
+          "- Output ONLY the cleaned transcript. No preamble, no greeting, no sign-off, no notes, no commentary, no headings, no quotes around the text, no \"Here is...\".\n" +
+          "- Do NOT add any information, opinions, examples, explanations, or context that is not literally in the transcript.\n" +
+          "- Do NOT summarize, shorten, expand, rephrase for style, or change the order of ideas.\n" +
+          "- Keep every word the speaker said. Only fix obvious filler (\"um\", \"uh\"), repeated words, and punctuation/capitalization.\n" +
+          "- If the transcript is a single sentence, output a single sentence. If it is one short phrase, output one short phrase.\n" +
+          "- Never invent a new paragraph, bullet list, or section that wasn't spoken.",
         user: transcript,
-        temperature: 0.2,
+        temperature: 0,
         maxTokens: 1500,
       });
     } else if (mode === "summary") {
       cleanedText = await chatCompletion({
         system:
-          "You summarize lecture or long voice transcripts into clean study notes. Output structured plain text:\n\n1) A 1-2 sentence overview.\n2) A bulleted list (using '- ') of the key points and any concrete details (definitions, formulas, names, dates).\n\nKeep it tight and accurate. Respond with ONLY the notes — no preamble.",
+          "You summarize an English voice/lecture transcript into clean study notes.\n\n" +
+          "Hard rules:\n" +
+          "- Output in English only. Never use any other language or script.\n" +
+          "- Output ONLY the notes. No preamble, no \"Here is the summary\", no sign-off.\n" +
+          "- Use ONLY information that is literally in the transcript. Do not invent facts, examples, or context.\n" +
+          "- Cover EVERY distinct point the speaker made — do not drop topics even if the recording is long.\n\n" +
+          "Format (plain text, no markdown headings):\n" +
+          "1) A 1-2 sentence overview of what the recording is about.\n" +
+          "2) A blank line, then a bulleted list (using '- ') of every key point, in the order the speaker said them. Include concrete details (definitions, names, numbers, dates, formulas) verbatim.",
         user: transcript,
-        temperature: 0.3,
-        maxTokens: 1500,
+        temperature: 0.2,
+        maxTokens: 2000,
       });
     }
 
